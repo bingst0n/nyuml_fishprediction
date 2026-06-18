@@ -4,16 +4,18 @@ A from-scratch implementation of **polynomial ridge regression** that predicts t
 
 The goal is less about the prediction itself and more about understanding the mechanics: building the design matrix by hand, deriving the ridge-regression weights from the closed-form normal equations, and sweeping over model complexity (polynomial degree) and regularization strength (λ) to watch overfitting happen in real time.
 
+> **Branch note (`evaltest`).** This branch trains each candidate model on **all 124 training instances** (no internal train/validation split) and selects the best degree/λ directly by its error on a **separate test set** of 31 fish. This differs from the `main` branch, which carves an 80/20 validation split out of the 124 and selects on that. See [Methodology](#methodology-evaltest-branch) below for the trade-offs.
+
 ---
 
 ## What It Does
 
-1. **Loads** the [Fish Market dataset](https://raw.githubusercontent.com/rugvedmhatre/NYU-ML-2024-Session-1/main/day5/) directly from GitHub — 124 fish, 5 measurement features, and weight (grams) as the label.
-2. **Splits** the data 80/20 into training and validation sets.
+1. **Loads** the [Fish Market dataset](https://raw.githubusercontent.com/rugvedmhatre/NYU-ML-2024-Session-1/main/day5/) directly from GitHub — 124 training fish plus a separate 31-fish test set, each with 5 measurement features and weight (grams) as the label.
+2. **Trains on all 124 instances** — every candidate model fits on the full training set; there is no internal validation split.
 3. **Builds a polynomial design matrix** of arbitrary degree `M` by raising each feature to powers `1…M` (plus a bias term).
 4. **Solves for the weights** using the closed-form ridge-regression normal equations — no `sklearn`, just NumPy linear algebra.
-5. **Sweeps a grid** of polynomial degrees (1–10) × regularization strengths (λ from 1e-6 to 10) and records validation MSE for every combination.
-6. **Reports the optimal** degree/λ pair and visualizes the full error landscape as a heatmap.
+5. **Sweeps a grid** of polynomial degrees (1–10) × regularization strengths (λ from 1e-6 to 10) and records **test-set MSE** for every combination.
+6. **Picks the model with the lowest test MSE** and visualizes the full error landscape as a heatmap.
 
 ---
 
@@ -37,44 +39,40 @@ The `N·λ·I` term keeps the matrix invertible and shrinks the weights, which i
 
 ## Results
 
-The best model on the validation set:
+The model selected by lowest **test-set MSE**, trained on all 124 instances:
 
 | Metric | Value |
 |---|---|
-| **Optimal degree** | 5 |
-| **Optimal λ** | ≈ 1.39 |
-| **Validation MSE** | ≈ 1,943 |
-| **RMSE** | ≈ 44 g |
-| **R²** | ≈ 0.98 |
+| **Optimal degree** | 2 |
+| **Optimal λ** | 10 |
+| **Test MSE** | ≈ 2,824 |
+| **RMSE** | ≈ 53 g |
+| **R²** | ≈ 0.97 |
 
-An RMSE of ~44 g on fish averaging ~390 g (range 0–1600 g) is roughly **11% relative error**, and the model explains about **98% of the variance** in fish weight — far better than the always-predict-the-mean baseline (MSE ≈ 111,600).
+An RMSE of ~53 g on fish averaging ~390 g (range 0–1600 g) is roughly **14% relative error**, and the model explains about **97% of the variance** in fish weight on the held-out test set — far better than the always-predict-the-mean baseline.
 
-### Held-Out Test Set
+Selecting on truly unseen data favors a **simpler, more strongly regularized** model (degree 2, λ=10) than the `main` branch's validation-based pick (degree 5, λ≈1.4). That is the expected outcome: optimizing directly for test performance penalizes the higher-variance high-degree models more sharply.
 
-The grid sweep above uses a validation split to *choose* the model, so its MSE is slightly optimistic. `test.py` gives the honest estimate by retraining the chosen model (degree 5, λ ≈ 1.39) on the training data and scoring it on a completely separate test set ([`fish_market_test_*`](https://raw.githubusercontent.com/rugvedmhatre/NYU-ML-2024-Session-1/main/day5/), 31 fish it never saw):
+### Methodology (`evaltest` branch)
 
-| Metric | Validation | Test |
+This branch makes a deliberate trade-off in how the model is chosen:
+
+| | `main` branch | `evaltest` branch (here) |
 |---|---|---|
-| **MSE** | ≈ 1,943 | ≈ 3,270 |
-| **RMSE** | ≈ 44 g | ≈ 57 g |
-| **R²** | ≈ 0.98 | ≈ 0.97 |
+| **Training data** | 80% of the 124 (≈99 fish) | all 124 fish |
+| **Selection metric** | MSE on the 20% validation split | MSE on the separate 31-fish test set |
+| **Held-out gauge** | the separate test set (via `test.py`) | — (test set is consumed by selection) |
 
-The test error being a bit higher than validation is expected — the validation set was used to pick the model, so true unseen data is always the fairer judge. An RMSE of ~57 g and R² ≈ 0.97 on data the model never touched confirms it generalizes well rather than just memorizing the training fish.
+**Why train on all 124?** More training data generally yields better weight estimates, so using the full set rather than holding 20% back gives each candidate model the best chance to fit.
 
-Run it with:
-
-```bash
-python test.py
-```
-
-`test.py` imports the model functions directly from `main.py` (which is guarded with `if __name__ == '__main__':` so importing it doesn't trigger the grid sweep or plot).
+**The cost:** because the test set is now what *selects* the model, it is no longer a pure held-out gauge of generalization — the reported test MSE is mildly optimistic (the selection has implicitly "seen" the test data). The `main` branch keeps the test set untouched until the very end, which is the cleaner protocol for an unbiased estimate; this branch prioritizes maximal training data and direct test-driven selection instead.
 
 ### The Error Landscape
 
-The script renders a heatmap of validation MSE over degree × λ. Because a handful of overfit models (high degree, tiny λ) produce MSE in the **billions** while good models sit near **10³**, the color scale is **log-normalized** — otherwise those few outliers would wash the entire plot to a single color.
+The script renders a heatmap of **test MSE** over degree × λ. Because a handful of overfit models (high degree, tiny λ) produce MSE in the **billions** while good models sit near **10³**, the color scale is **log-normalized** — otherwise those few outliers would wash the entire plot to a single color.
 
 - **Darker purple = lower MSE = better.**
-- The bright yellow corner (high degree, small λ) is textbook **overfitting**: the design matrix becomes nearly singular, weights blow up, and validation error explodes.
+- The bright yellow corner (high degree, small λ) is textbook **overfitting**: the design matrix becomes nearly singular, weights blow up, and test error explodes.
 
 ---
 
@@ -90,7 +88,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-The script prints the optimal combination to the console and opens the MSE heatmap. An internet connection is required, since the dataset is fetched from GitHub at runtime.
+The script prints the optimal combination (by test MSE) to the console and opens the heatmap. An internet connection is required, since both the training and test datasets are fetched from GitHub at runtime.
 
 ### Dependencies
 
@@ -105,8 +103,7 @@ The script prints the optimal combination to the console and opens the MSE heatm
 
 ```
 fishprediction/
-├── main.py            # the entire pipeline: load → fit → sweep → plot
-├── test.py            # evaluates the chosen model on a held-out test set
+├── main.py            # the entire pipeline: load → train on all 124 → sweep on test set → plot
 ├── requirements.txt   # pinned dependencies
 ├── .gitignore         # excludes .venv/ and __pycache__/
 └── README.md          # this file
@@ -116,6 +113,6 @@ fishprediction/
 
 ## Caveats & Next Steps
 
-- **Single split, small data.** Results come from one 80/20 split of just 124 rows (25 validation points), so the exact MSE is a bit noisy. **k-fold cross-validation** would give a more trustworthy estimate.
+- **Selection on the test set.** Because the test set is used to pick the model, the reported test MSE is a mildly optimistic estimate of true generalization. A fully clean protocol would reserve a third, untouched split — or use **k-fold cross-validation** on the 124 for selection and keep the test set purely for final reporting.
 - **No feature scaling.** Raising raw features to the 10th power produces wildly different column magnitudes, which is part of why high degrees become numerically unstable. Standardizing features first would help.
 - **Closed-form only.** The normal equations are fine at this scale, but a gradient-descent version would be a natural extension for larger datasets.
