@@ -23,4 +23,4 @@ def test_metrics(M, lam):
 
 
 mse, rmse, r2 = test_metrics(M, lam)
-print(f'Test (degree {M}, lambda {lam}): MSE {mse:.2f}, RMSE {rmse:.2f}, R^2 {r2:.4f}')
+print(f'Test (degree {M}, lambda {lam}): MSE {mse}, RMSE {rmse}, R^2 {r2}')
