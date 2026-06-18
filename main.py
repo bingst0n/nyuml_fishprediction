@@ -7,17 +7,18 @@ import matplotlib.colors
 feature = pd.read_csv('https://raw.githubusercontent.com/rugvedmhatre/NYU-ML-2024-Session-1/main/day5/fish_market_feature.csv')
 label = pd.read_csv('https://raw.githubusercontent.com/rugvedmhatre/NYU-ML-2024-Session-1/main/day5/fish_market_label.csv')
 
-train_size = int(0.8 * len(feature)) # 80-20 split
+test_feature = pd.read_csv('https://raw.githubusercontent.com/rugvedmhatre/NYU-ML-2024-Session-1/main/day5/fish_market_test_feature.csv')
+test_label = pd.read_csv('https://raw.githubusercontent.com/rugvedmhatre/NYU-ML-2024-Session-1/main/day5/fish_market_test_label.csv')
 
-X = feature.values[:train_size]
-Y = label.values[:train_size]
+# Train on all 124 instances; evaluate on the separate test set.
+X = feature.values
+Y = label.values
 
-X_valid = feature.values[train_size:]
-Y_valid = label.values[train_size:]
+X_test = test_feature.values
+Y_test = test_label.values
 
 F = X.shape[1]
 N = X.shape[0]
-N_valid = X_valid.shape[0]
 
 def mega_design_matrix(xvals, M: int):
   rows = xvals.shape[0]
@@ -56,19 +57,14 @@ lam_range = np.logspace(-6, 1, 50)
 
 def evaluate_model(degree, hyper):
     design_train = mega_design_matrix(X, degree)
-    design_valid = mega_design_matrix(X_valid, degree)
+    design_test = mega_design_matrix(X_test, degree)
 
     weights = compute_weights(design_train, degree, hyper)
 
-    results = Y_valid - np.matmul(design_valid, weights)
-    total1 = 0
-    for result in results:
-       total1 += result**2
-    total1 /= N_valid
+    preds = np.matmul(design_test, weights)
+    mse = np.mean((Y_test - preds) ** 2)
 
-    # Lambda omitted here; regularization not in output
-
-    return (total1)[0]
+    return mse
 
 def bulk_test(degs, lams):
     degree_lambdas_results = np.zeros((len(degs), len(lams)))
@@ -82,13 +78,13 @@ if __name__ == '__main__':
     finalresults = bulk_test(M_range, lam_range)
 
     best = np.unravel_index(np.argmin(finalresults), finalresults.shape)
-    print(f"Optimal: degree {M_range[best[0]]}, lambda {lam_range[best[1]]:.4g}, MSE {finalresults[best]:.2f}, mean MSE {finalresults.mean():.2f}")
+    print(f"Optimal (by test MSE): degree {M_range[best[0]]}, lambda {lam_range[best[1]]:.4g}, test MSE {finalresults[best]:.2f}, mean test MSE {finalresults.mean():.2f}")
 
     plt.figure(figsize=(10, 6))
     plt.imshow(finalresults, aspect='auto', origin='lower', cmap='viridis',
                norm=matplotlib.colors.LogNorm())
     plt.xlabel('Lambda (log scale)')
     plt.ylabel('Degree')
-    plt.colorbar(label='MSE')
-    plt.title('MSE vs Degree and Lambda')
+    plt.colorbar(label='Test MSE')
+    plt.title('Test MSE vs Degree and Lambda')
     plt.show()
