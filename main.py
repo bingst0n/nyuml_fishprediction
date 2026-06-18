@@ -78,16 +78,17 @@ def bulk_test(degs, lams):
           degree_lambdas_results[di][li] = evaluate_model(deg, lam)
     return degree_lambdas_results
 
-finalresults = bulk_test(M_range, lam_range)
+if __name__ == '__main__':
+    finalresults = bulk_test(M_range, lam_range)
 
-best = np.unravel_index(np.argmin(finalresults), finalresults.shape)
-print(f"Optimal: degree {M_range[best[0]]}, lambda {lam_range[best[1]]:.4g}, MSE {finalresults[best]:.2f}, mean MSE {finalresults.mean():.2f}")
+    best = np.unravel_index(np.argmin(finalresults), finalresults.shape)
+    print(f"Optimal: degree {M_range[best[0]]}, lambda {lam_range[best[1]]:.4g}, MSE {finalresults[best]:.2f}, mean MSE {finalresults.mean():.2f}")
 
-plt.figure(figsize=(10, 6))
-plt.imshow(finalresults, aspect='auto', origin='lower', cmap='viridis',
-           norm=matplotlib.colors.LogNorm())
-plt.xlabel('Lambda (log scale)')
-plt.ylabel('Degree')
-plt.colorbar(label='MSE')
-plt.title('MSE vs Degree and Lambda')
-plt.show()
+    plt.figure(figsize=(10, 6))
+    plt.imshow(finalresults, aspect='auto', origin='lower', cmap='viridis',
+               norm=matplotlib.colors.LogNorm())
+    plt.xlabel('Lambda (log scale)')
+    plt.ylabel('Degree')
+    plt.colorbar(label='MSE')
+    plt.title('MSE vs Degree and Lambda')
+    plt.show()

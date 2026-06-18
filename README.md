@@ -49,6 +49,26 @@ The best model on the validation set:
 
 An RMSE of ~44 g on fish averaging ~390 g (range 0–1600 g) is roughly **11% relative error**, and the model explains about **98% of the variance** in fish weight — far better than the always-predict-the-mean baseline (MSE ≈ 111,600).
 
+### Held-Out Test Set
+
+The grid sweep above uses a validation split to *choose* the model, so its MSE is slightly optimistic. `test.py` gives the honest estimate by retraining the chosen model (degree 5, λ ≈ 1.39) on the training data and scoring it on a completely separate test set ([`fish_market_test_*`](https://raw.githubusercontent.com/rugvedmhatre/NYU-ML-2024-Session-1/main/day5/), 31 fish it never saw):
+
+| Metric | Validation | Test |
+|---|---|---|
+| **MSE** | ≈ 1,943 | ≈ 3,270 |
+| **RMSE** | ≈ 44 g | ≈ 57 g |
+| **R²** | ≈ 0.98 | ≈ 0.97 |
+
+The test error being a bit higher than validation is expected — the validation set was used to pick the model, so true unseen data is always the fairer judge. An RMSE of ~57 g and R² ≈ 0.97 on data the model never touched confirms it generalizes well rather than just memorizing the training fish.
+
+Run it with:
+
+```bash
+python test.py
+```
+
+`test.py` imports the model functions directly from `main.py` (which is guarded with `if __name__ == '__main__':` so importing it doesn't trigger the grid sweep or plot).
+
 ### The Error Landscape
 
 The script renders a heatmap of validation MSE over degree × λ. Because a handful of overfit models (high degree, tiny λ) produce MSE in the **billions** while good models sit near **10³**, the color scale is **log-normalized** — otherwise those few outliers would wash the entire plot to a single color.
@@ -86,6 +106,7 @@ The script prints the optimal combination to the console and opens the MSE heatm
 ```
 fishprediction/
 ├── main.py            # the entire pipeline: load → fit → sweep → plot
+├── test.py            # evaluates the chosen model on a held-out test set
 ├── requirements.txt   # pinned dependencies
 ├── .gitignore         # excludes .venv/ and __pycache__/
 └── README.md          # this file
